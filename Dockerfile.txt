@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && python -m spacy download it_core_news_sm
+COPY . .
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]

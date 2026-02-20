@@ -1,0 +1,5 @@
+{
+    "microfono": "https://amzn.to/3XmJkLp",
+    "cuffie": "https://amzn.to/3YmRsTq",
+    "smartphone": "https://amzn.to/4aBcDeF"
+}
