@@ -5,17 +5,9 @@ import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tempfile
-import spacy
 
 app = Flask(__name__)
 CORS(app)
-
-# Carica modello NLP italiano
-nlp = spacy.load("it_core_news_sm")
-
-# Carica database prodotti (da file JSON)
-with open('product_db.json', 'r', encoding='utf-8') as f:
-    product_db = json.load(f)
 
 ASSEMBLYAI_API_KEY = os.environ.get('ASSEMBLYAI_API_KEY')
 if not ASSEMBLYAI_API_KEY:
@@ -46,12 +38,11 @@ def transcribe():
         transcript_id = request_transcription(audio_url)
         result = get_transcription_result(transcript_id)
 
+        # Estrai concetti (primi 5 bullet del riassunto)
         concepts = []
         if result.get('summary'):
             sentences = result['summary'].split('. ')
             concepts = [s.strip() for s in sentences if s][:5]
-
-        products = extract_products(result.get('text', ''))
 
         output = {
             'id': result['id'],
@@ -59,10 +50,9 @@ def transcribe():
             'utterances': result.get('utterances'),
             'summary': result.get('summary'),
             'concept_map': concepts,
-            'suggested_products': products
+            # Rimossa la parte prodotti per semplicità (puoi reinserirla dopo)
         }
         return jsonify(output), 200
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -76,11 +66,7 @@ def upload_file_to_assembly(audio_file_path):
                 if not data:
                     break
                 yield data
-    upload_response = requests.post(
-        UPLOAD_URL,
-        headers=HEADERS,
-        data=read_file(audio_file_path)
-    )
+    upload_response = requests.post(UPLOAD_URL, headers=HEADERS, data=read_file(audio_file_path))
     return upload_response.json()['upload_url']
 
 def request_transcription(audio_url):
@@ -96,28 +82,13 @@ def request_transcription(audio_url):
 def get_transcription_result(transcript_id):
     polling_endpoint = f"{TRANSCRIPT_URL}/{transcript_id}"
     while True:
-        transcription_result = requests.get(polling_endpoint, headers=HEADERS).json()
-        if transcription_result['status'] == 'completed':
-            return transcription_result
-        elif transcription_result['status'] == 'error':
-            raise RuntimeError(f"Trascrizione fallita: {transcription_result['error']}")
+        res = requests.get(polling_endpoint, headers=HEADERS).json()
+        if res['status'] == 'completed':
+            return res
+        elif res['status'] == 'error':
+            raise RuntimeError(f"Errore: {res['error']}")
         else:
             time.sleep(3)
-
-def extract_products(text):
-    doc = nlp(text)
-    found = []
-    for token in doc:
-        if token.pos_ == "NOUN" and token.lemma_ in product_db:
-            found.append({
-                'name': token.text,
-                'link': product_db[token.lemma_]
-            })
-    unique = []
-    for p in found:
-        if p not in unique:
-            unique.append(p)
-    return unique
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
