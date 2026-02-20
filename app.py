@@ -49,8 +49,7 @@ def transcribe():
             'text': result['text'],
             'utterances': result.get('utterances'),
             'summary': result.get('summary'),
-            'concept_map': concepts,
-            # Rimossa la parte prodotti per semplicità (puoi reinserirla dopo)
+            'concept_map': concepts
         }
         return jsonify(output), 200
     except Exception as e:
