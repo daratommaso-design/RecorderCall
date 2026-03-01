@@ -12,48 +12,60 @@ HEADERS = {'authorization': ASSEMBLYAI_API_KEY, 'content-type': 'application/jso
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
+    if 'file' not in request.files: return jsonify({'error': 'No file'}), 400
     file = request.files['file']
     with tempfile.NamedTemporaryFile(delete=False, suffix='.3gp') as tmp:
         file.save(tmp.name)
         temp_file_path = tmp.name
     try:
-        # Caricamento e Trascrizione
-        audio_response = requests.post(UPLOAD_URL, headers=HEADERS, data=open(temp_file_path, 'rb'))
+        # Upload
+        with open(temp_file_path, 'rb') as f:
+            audio_response = requests.post(UPLOAD_URL, headers=HEADERS, data=f)
         audio_url = audio_response.json()['upload_url']
         
+        # Configurazione parametri (Aggiornata per evitare 500)
         json_body = {
             'audio_url': audio_url,
             'speaker_labels': True,
             'summarization': True,
             'summary_type': 'bullets',
             'summary_model': 'informative',
-            'speech_model': 'universal-3-pro',
-            'language_code': 'it'
+            'speech_models': ['universal-3-pro'], # DEVE ESSERE UNA LISTA
+            'language_code': 'it' # Forza italiano per evitare errori su audio brevi
         }
-        transcript_id = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS).json()['id']
+        
+        resp = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS).json()
+        if 'error' in resp: raise RuntimeError(resp['error'])
+        transcript_id = resp['id']
         
         # Polling
         while True:
             res = requests.get(f"{TRANSCRIPT_URL}/{transcript_id}", headers=HEADERS).json()
             if res['status'] == 'completed': break
-            elif res['status'] == 'error': raise RuntimeError(res['error'])
+            elif res['status'] == 'error': raise RuntimeError(res.get('error', 'Processing failed'))
             time.sleep(3)
 
-        # Mappa concettuale dai bullet point
+        # Risultato e Mappa Concettuale
         summary = res.get('summary', '')
-        concepts = [s.strip() for s in summary.split('. ') if len(s) > 5][:5]
+        text = res.get('text', '')
+        # Fallback concetti se il riassunto è troppo breve
+        if summary:
+            concepts = [s.strip() for s in summary.split('. ') if len(s) > 5][:5]
+        else:
+            concepts = [s.strip() for s in text.split('. ') if len(s) > 5][:3]
 
         return jsonify({
             'id': res['id'],
-            'text': res.get('text', ''),
+            'text': text,
             'utterances': res.get('utterances', []),
-            'summary': summary,
+            'summary': summary or "Audio troppo breve per un riassunto completo.",
             'concept_map': concepts
         }), 200
     except Exception as e:
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
-        os.unlink(temp_file_path)
+        if os.path.exists(temp_file_path): os.unlink(temp_file_path)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5001)))
