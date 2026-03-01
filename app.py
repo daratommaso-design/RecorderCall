@@ -82,7 +82,8 @@ def request_transcription(audio_url):
         'audio_url': audio_url,
         'speaker_labels': True,
         'summarization': True,
-        'summary_type': 'bullets'
+        'summary_type': 'bullets',
+        'speech_models': ["universal-2"]  # Modello richiesto da AssemblyAI
     }
     response = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS)
     data = response.json()
