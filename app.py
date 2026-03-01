@@ -39,6 +39,7 @@ def transcribe():
         transcript_id = request_transcription(audio_url)
         result = get_transcription_result(transcript_id)
 
+        # Estrai concetti (primi 5 bullet del riassunto)
         concepts = []
         if result.get('summary'):
             sentences = result['summary'].split('. ')
@@ -83,7 +84,7 @@ def request_transcription(audio_url):
         'speaker_labels': True,
         'summarization': True,
         'summary_type': 'bullets',
-        'summary_model': 'informational',
+        'summary_model': 'informative',  # Valore corretto
         'speech_models': ["universal-2"]
     }
     response = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS)
