@@ -39,7 +39,6 @@ def transcribe():
         transcript_id = request_transcription(audio_url)
         result = get_transcription_result(transcript_id)
 
-        # Estrai concetti (primi 5 bullet del riassunto)
         concepts = []
         if result.get('summary'):
             sentences = result['summary'].split('. ')
@@ -54,7 +53,6 @@ def transcribe():
         }
         return jsonify(output), 200
     except Exception as e:
-        # Stampa l'errore nei log di Render
         print("="*50)
         print("ERRORE NEL BACKEND:")
         print(str(e))
@@ -62,7 +60,6 @@ def transcribe():
         print("="*50)
         return jsonify({'error': str(e)}), 500
     finally:
-        # Pulisce il file temporaneo
         os.unlink(temp_file_path)
 
 def upload_file_to_assembly(audio_file_path):
@@ -88,7 +85,12 @@ def request_transcription(audio_url):
         'summary_type': 'bullets'
     }
     response = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS)
-    return response.json()['id']
+    data = response.json()
+    if 'error' in data:
+        raise RuntimeError(f"AssemblyAI error: {data['error']}")
+    if 'id' not in data:
+        raise RuntimeError(f"Unexpected response from AssemblyAI: {data}")
+    return data['id']
 
 def get_transcription_result(transcript_id):
     polling_endpoint = f"{TRANSCRIPT_URL}/{transcript_id}"
