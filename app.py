@@ -2,6 +2,7 @@ import os
 import requests
 import time
 import json
+import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tempfile
@@ -53,8 +54,15 @@ def transcribe():
         }
         return jsonify(output), 200
     except Exception as e:
+        # Stampa l'errore nei log di Render
+        print("="*50)
+        print("ERRORE NEL BACKEND:")
+        print(str(e))
+        traceback.print_exc()
+        print("="*50)
         return jsonify({'error': str(e)}), 500
     finally:
+        # Pulisce il file temporaneo
         os.unlink(temp_file_path)
 
 def upload_file_to_assembly(audio_file_path):
@@ -65,7 +73,11 @@ def upload_file_to_assembly(audio_file_path):
                 if not data:
                     break
                 yield data
-    upload_response = requests.post(UPLOAD_URL, headers=HEADERS, data=read_file(audio_file_path))
+    upload_response = requests.post(
+        UPLOAD_URL,
+        headers=HEADERS,
+        data=read_file(audio_file_path)
+    )
     return upload_response.json()['upload_url']
 
 def request_transcription(audio_url):
@@ -85,7 +97,7 @@ def get_transcription_result(transcript_id):
         if res['status'] == 'completed':
             return res
         elif res['status'] == 'error':
-            raise RuntimeError(f"Errore: {res['error']}")
+            raise RuntimeError(f"Errore AssemblyAI: {res['error']}")
         else:
             time.sleep(3)
 
