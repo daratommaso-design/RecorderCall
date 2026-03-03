@@ -37,13 +37,14 @@ def transcribe():
         audio_url = audio_response.json()['upload_url']
         
         # 2. Configurazione della trascrizione (Ottimizzata per l'Italiano)
-        # Abbiamo rimosso 'summary_model': 'informative' perché non supportato in IT
+        # Aggiunto il parametro 'speech_models' per specificare il modello (richiesto dall'API)
         json_body = {
             'audio_url': audio_url,
             'speaker_labels': True,
             'summarization': True,
             'summary_type': 'bullets',
-            'language_code': 'it' 
+            'language_code': 'it',
+            'speech_models': ['universal-2']  # 👈 Modifica chiave: aggiunto modello predefinito
         }
         
         # Invio della richiesta di trascrizione
