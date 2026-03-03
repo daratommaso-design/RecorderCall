@@ -21,7 +21,6 @@ def transcribe():
     
     file = request.files['file']
     
-    # Creazione di un file temporaneo per salvare l'audio ricevuto dall'app
     with tempfile.NamedTemporaryFile(delete=False, suffix='.3gp') as tmp:
         file.save(tmp.name)
         temp_file_path = tmp.name
@@ -36,26 +35,35 @@ def transcribe():
             
         audio_url = audio_response.json()['upload_url']
         
-        # 2. Configurazione della trascrizione (Ottimizzata per l'Italiano)
-        # Aggiunto il parametro 'speech_models' per specificare il modello (richiesto dall'API)
+        # 2. Configurazione della trascrizione
         json_body = {
             'audio_url': audio_url,
             'speaker_labels': True,
             'summarization': True,
             'summary_type': 'bullets',
             'language_code': 'it',
-            'speech_models': ['universal-2']  # 👈 Modifica chiave: aggiunto modello predefinito
+            'speech_models': ['universal-3-pro']  # 👈 Proviamo con universal-3-pro
         }
         
+        # Log della richiesta
+        print("🔵 Invio ad AssemblyAI:", json_body)
+        
         # Invio della richiesta di trascrizione
-        transcript_response = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS).json()
+        transcript_response = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS)
+        print("🔵 Status AssemblyAI:", transcript_response.status_code)
+        print("🔵 Risposta AssemblyAI:", transcript_response.text)
         
-        if 'error' in transcript_response:
-            raise RuntimeError(transcript_response['error'])
+        if transcript_response.status_code != 200:
+            raise RuntimeError(f"Errore AssemblyAI: {transcript_response.text}")
+        
+        transcript_data = transcript_response.json()
+        
+        if 'error' in transcript_data:
+            raise RuntimeError(transcript_data['error'])
             
-        transcript_id = transcript_response['id']
+        transcript_id = transcript_data['id']
         
-        # 3. Polling: attendiamo che AssemblyAI finisca di elaborare
+        # 3. Polling
         while True:
             res = requests.get(f"{TRANSCRIPT_URL}/{transcript_id}", headers=HEADERS).json()
             if res['status'] == 'completed':
@@ -64,15 +72,13 @@ def transcribe():
                 raise RuntimeError(res.get('error', 'Elaborazione fallita'))
             time.sleep(3)
 
-        # 4. Elaborazione dei risultati per l'app Android
+        # 4. Elaborazione risultati
         summary = res.get('summary', '')
         text = res.get('text', '')
         
-        # Generazione automatica dei concetti chiave dai risultati
         concepts = []
         source = summary if summary else text
         if source:
-            # Estraiamo alcune frasi significative come 'concetti'
             concepts = [s.strip() for s in source.split('. ') if len(s) > 10][:5]
 
         return jsonify({
@@ -87,11 +93,9 @@ def transcribe():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
-        # Pulizia: eliminiamo il file temporaneo dal server
         if os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
 
 if __name__ == '__main__':
-    # Render usa la porta 10000 di default
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
