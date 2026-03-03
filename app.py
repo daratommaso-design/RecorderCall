@@ -6,6 +6,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Configurazione API AssemblyAI
+# Assicurati che ASSEMBLYAI_API_KEY sia impostata nelle "Environment Variables" su Render
 ASSEMBLYAI_API_KEY = os.environ.get('ASSEMBLYAI_API_KEY')
 TRANSCRIPT_URL = "https://api.assemblyai.com/v2/transcript"
 UPLOAD_URL = "https://api.assemblyai.com/v2/upload"
@@ -17,6 +18,7 @@ def transcribe():
         return jsonify({'error': 'Nessun file inviato'}), 400
     
     file = request.files['file']
+    
     # Creazione file temporaneo per gestire l'audio in arrivo
     with tempfile.NamedTemporaryFile(delete=False, suffix='.3gp') as tmp:
         file.save(tmp.name)
@@ -32,8 +34,8 @@ def transcribe():
             
         audio_url = audio_response.json()['upload_url']
         
-        # 2. Richiesta di trascrizione ottimizzata per l'Italiano
-        # Nota: summarization è False per evitare errori 500 su AssemblyAI
+        # 2. Richiesta di trascrizione sicura per l'italiano
+        # Evitiamo speech_models e summarization nativo per prevenire errori 500
         json_body = {
             'audio_url': audio_url,
             'speaker_labels': True,
@@ -59,8 +61,8 @@ def transcribe():
         text = res.get('text', '')
         utterances = res.get('utterances', [])
         
-        # 5. LOGICA DI GENERAZIONE RIASSUNTO E MAPPA (Fallback per Italiano)
-        # Poiché AssemblyAI non riassume bene in IT, lo facciamo noi via codice
+        # 5. LOGICA DI GENERAZIONE RIASSUNTO E MAPPA (Fallback)
+        # Creiamo i contenuti partendo dal testo per garantire che l'app li riceva
         summary = ""
         concepts = []
         
@@ -72,7 +74,7 @@ def transcribe():
                 if len(sentences) > 3: 
                     summary += "..."
             
-            # Creazione Mappa Concettuale: estraiamo frasi chiave di media lunghezza
+            # Creazione Mappa Concettuale: estraiamo frasi di lunghezza media come punti chiave
             concepts = [s.strip() for s in text.split('.') if 15 < len(s.strip()) < 80][:5]
 
         # 6. Risposta finale verso l'App Android
@@ -80,7 +82,7 @@ def transcribe():
             'id': res['id'],
             'text': text,
             'utterances': utterances,
-            'summary': summary or "Testo troppo breve per generare un riassunto.",
+            'summary': summary or "Audio troppo breve per generare un riassunto.",
             'concept_map': concepts
         }), 200
 
@@ -93,6 +95,6 @@ def transcribe():
             os.unlink(temp_file_path)
 
 if __name__ == '__main__':
-    # Porta dinamica richiesta da Render (default 10000)
+    # Porta richiesta da Render
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
