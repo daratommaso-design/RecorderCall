@@ -22,11 +22,11 @@ def transcribe():
             audio_response = requests.post(UPLOAD_URL, headers=HEADERS, data=f)
         audio_url = audio_response.json()['upload_url']
         
-        # Richiesta sicura (senza summarization nativa per evitare errore 500)
+        # CONFIGURAZIONE SICURA: Usiamo language_detection per evitare errori 500
         json_body = {
             'audio_url': audio_url,
-            'language_code': 'it',
-            'speaker_labels': True
+            'speaker_labels': True,
+            'language_detection': True  # Rileva automaticamente ed evita conflitti
         }
         
         resp = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS).json()
@@ -40,25 +40,21 @@ def transcribe():
             time.sleep(3)
 
         text = res.get('text', '')
-        utterances = res.get('utterances', [])
-        
-        # GENERAZIONE MANUALE (per l'italiano)
         summary = ""
         concepts = []
         if text:
-            # Crea riassunto con le prime 3 frasi
+            # Riassunto manuale
             sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 5]
             if len(sentences) > 0:
                 summary = ". ".join(sentences[:3]) + ("..." if len(sentences) > 3 else "")
-            
-            # Crea mappa concettuale con le frasi medie
+            # Mappa concettuale manuale
             concepts = [s.strip() for s in text.split('.') if 15 < len(s.strip()) < 80][:5]
 
         return jsonify({
             'id': res['id'],
             'text': text,
-            'utterances': utterances,
-            'summary': summary or "Audio troppo breve per un riassunto.",
+            'utterances': res.get('utterances', []),
+            'summary': summary or "Audio troppo breve.",
             'concept_map': concepts
         }), 200
     except Exception as e:
