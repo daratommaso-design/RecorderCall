@@ -22,43 +22,37 @@ def transcribe():
             audio_response = requests.post(UPLOAD_URL, headers=HEADERS, data=f)
         audio_url = audio_response.json()['upload_url']
         
-        # CONFIGURAZIONE SICURA: Usiamo language_detection per evitare errori 500
+        # RICHIESTA ULTRA-STABILE PER ITALIANO
         json_body = {
             'audio_url': audio_url,
-            'speaker_labels': True,
-            'language_detection': True  # Rileva automaticamente ed evita conflitti
+            'language_detection': True, # Fa tutto l'AI in modo sicuro
+            'speaker_labels': True
         }
         
         resp = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS).json()
-        if 'error' in resp: raise RuntimeError(resp['error'])
+        if 'error' in resp: return jsonify({'error': resp['error']}), 500
         transcript_id = resp['id']
         
         while True:
             res = requests.get(f"{TRANSCRIPT_URL}/{transcript_id}", headers=HEADERS).json()
             if res['status'] == 'completed': break
-            elif res['status'] == 'error': raise RuntimeError(res.get('error', 'Processing failed'))
+            elif res['status'] == 'error': return jsonify({'error': 'AI processing failed'}), 500
             time.sleep(3)
 
         text = res.get('text', '')
-        summary = ""
-        concepts = []
-        if text:
-            # Riassunto manuale
-            sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 5]
-            if len(sentences) > 0:
-                summary = ". ".join(sentences[:3]) + ("..." if len(sentences) > 3 else "")
-            # Mappa concettuale manuale
-            concepts = [s.strip() for s in text.split('.') if 15 < len(s.strip()) < 80][:5]
+        # Generazione manuale per evitare campi vuoti
+        sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 5]
+        summary = ". ".join(sentences[:3]) + "..." if len(sentences) > 0 else "Audio troppo breve."
+        concepts = [s.strip() for s in text.split('.') if 15 < len(s.strip()) < 80][:5]
 
         return jsonify({
             'id': res['id'],
             'text': text,
             'utterances': res.get('utterances', []),
-            'summary': summary or "Audio troppo breve.",
+            'summary': summary,
             'concept_map': concepts
         }), 200
     except Exception as e:
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         if os.path.exists(temp_file_path): os.unlink(temp_file_path)
