@@ -22,7 +22,7 @@ def transcribe():
             audio_response = requests.post(UPLOAD_URL, headers=HEADERS, data=f)
         audio_url = audio_response.json()['upload_url']
         
-        # RICHIESTA MINIMA (Evita errore 500)
+        # RICHIESTA STABILE PER ITALIANO
         json_body = {
             'audio_url': audio_url,
             'language_code': 'it',
@@ -40,9 +40,9 @@ def transcribe():
             time.sleep(3)
 
         text = res.get('text', '')
-        # Generazione manuale Riassunto e Mappa per l'italiano
+        # Generazione manuale riassunto e mappa concettuale
         sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 5]
-        summary = ". ".join(sentences[:3]) + "..." if len(sentences) > 0 else "Testo troppo breve."
+        summary = ". ".join(sentences[:3]) + "..." if len(sentences) > 0 else "Audio troppo breve."
         concepts = [s.strip() for s in text.split('.') if 15 < len(s.strip()) < 80][:5]
 
         return jsonify({
