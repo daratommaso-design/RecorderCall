@@ -22,7 +22,7 @@ def transcribe():
             audio_response = requests.post(UPLOAD_URL, headers=HEADERS, data=f)
         audio_url = audio_response.json()['upload_url']
         
-        # RICHIESTA STABILE PER ITALIANO
+        # RICHIESTA ULTRA-SICURA (Senza parametri che causano errori 500)
         json_body = {
             'audio_url': audio_url,
             'language_code': 'it',
@@ -40,7 +40,9 @@ def transcribe():
             time.sleep(3)
 
         text = res.get('text', '')
-        # Generazione manuale riassunto e mappa concettuale
+        utterances = res.get('utterances', [])
+        
+        # Generazione manuale Riassunto e Mappa (AssemblyAI non lo fa in IT)
         sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 5]
         summary = ". ".join(sentences[:3]) + "..." if len(sentences) > 0 else "Audio troppo breve."
         concepts = [s.strip() for s in text.split('.') if 15 < len(s.strip()) < 80][:5]
@@ -48,7 +50,7 @@ def transcribe():
         return jsonify({
             'id': res['id'],
             'text': text,
-            'utterances': res.get('utterances', []),
+            'utterances': utterances,
             'summary': summary,
             'concept_map': concepts
         }), 200
