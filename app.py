@@ -22,27 +22,27 @@ def transcribe():
             audio_response = requests.post(UPLOAD_URL, headers=HEADERS, data=f)
         audio_url = audio_response.json()['upload_url']
         
-        # RICHIESTA ULTRA-STABILE PER ITALIANO
+        # RICHIESTA MINIMA (Evita errore 500)
         json_body = {
             'audio_url': audio_url,
-            'language_detection': True, # Fa tutto l'AI in modo sicuro
+            'language_code': 'it',
             'speaker_labels': True
         }
         
         resp = requests.post(TRANSCRIPT_URL, json=json_body, headers=HEADERS).json()
-        if 'error' in resp: return jsonify({'error': resp['error']}), 500
+        if 'error' in resp: return jsonify({'error': f"AI Error: {resp['error']}"}), 500
         transcript_id = resp['id']
         
         while True:
             res = requests.get(f"{TRANSCRIPT_URL}/{transcript_id}", headers=HEADERS).json()
             if res['status'] == 'completed': break
-            elif res['status'] == 'error': return jsonify({'error': 'AI processing failed'}), 500
+            elif res['status'] == 'error': return jsonify({'error': 'Processing failed'}), 500
             time.sleep(3)
 
         text = res.get('text', '')
-        # Generazione manuale per evitare campi vuoti
+        # Generazione manuale Riassunto e Mappa per l'italiano
         sentences = [s.strip() for s in text.split('.') if len(s.strip()) > 5]
-        summary = ". ".join(sentences[:3]) + "..." if len(sentences) > 0 else "Audio troppo breve."
+        summary = ". ".join(sentences[:3]) + "..." if len(sentences) > 0 else "Testo troppo breve."
         concepts = [s.strip() for s in text.split('.') if 15 < len(s.strip()) < 80][:5]
 
         return jsonify({
